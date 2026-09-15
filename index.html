@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Stapel</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1A1D22">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Stapel">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+:root{
+  --ground:#1A1D22;
+  --surface:#23272E;
+  --line:#343A43;
+  --ink:#E9E6E0;
+  --ink-2:#9BA2AB;
+  --ink-3:#646C76;
+  --fert:#D8862E;
+  --teil:#5AA469;
+  --elek:#4A86C8;
+  --auto:#C8453C;
+  --fin:#9B76C4;
+  --band:var(--ink-3);
+  --pad:22px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;overscroll-behavior:none}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:17px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  touch-action:pan-y;
+  user-select:none;
+}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:4px}
+
+#app{
+  position:fixed;inset:0;display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 14px) var(--pad) calc(env(safe-area-inset-bottom) + 14px);
+}
+
+/* Farbband am linken Rand – Kategoriekennung */
+#band{
+  position:fixed;left:0;top:0;bottom:0;width:7px;
+  background:var(--band);transition:background .25s ease;
+}
+
+/* Kopfzeile */
+header{display:flex;align-items:center;gap:14px;flex:0 0 auto}
+#ticks{display:flex;gap:4px;flex:1 1 auto;height:3px}
+#ticks i{flex:1 1 0;background:var(--line);border-radius:2px;transition:background .2s}
+#ticks i.on{background:var(--ink)}
+.iconbtn{width:34px;height:34px;display:grid;place-items:center;color:var(--ink-2);flex:0 0 auto}
+.iconbtn svg{width:19px;height:19px;display:block;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn[aria-pressed="true"]{color:var(--ink)}
+
+/* Karte */
+main{flex:1 1 auto;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:6px;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+main::-webkit-scrollbar{display:none}
+@media (max-height:680px){
+  h1{font-size:clamp(23px,6.4vw,30px);margin-bottom:12px}
+  #body{font-size:16px}
+  #extra{font-size:14.5px;padding:12px 14px}
+}
+#cat{
+  font-size:13px;letter-spacing:.02em;color:var(--band);
+  display:flex;align-items:center;gap:8px;margin-bottom:14px;flex:0 0 auto;
+}
+#cat::before{content:"";width:16px;height:2px;background:currentColor;display:block}
+h1{
+  font-size:clamp(27px,7.6vw,38px);line-height:1.12;
+  font-weight:640;letter-spacing:-.022em;margin:0 0 16px;
+  max-width:19ch;
+}
+#body{font-size:clamp(16.5px,4.4vw,20px);line-height:1.55;color:#D6D3CD;margin:0;max-width:34ch}
+#extra{
+  margin:16px 0 0;padding:14px 16px;background:var(--surface);
+  border-left:2px solid var(--band);border-radius:0 8px 8px 0;
+  font-size:15.5px;line-height:1.5;color:var(--ink-2);max-width:36ch;
+}
+#extra[hidden]{display:none}
+#morebtn{margin-top:16px;font-size:15px;color:var(--band);border-bottom:1px solid currentColor;padding-bottom:2px}
+.anim{animation:rise .24s cubic-bezier(.22,.7,.3,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* Fußzeile */
+footer{flex:0 0 auto;display:flex;align-items:center;gap:16px;padding-top:18px;border-top:1px solid var(--line)}
+#count{font-size:14px;color:var(--ink-3);flex:1 1 auto;font-variant-numeric:tabular-nums}
+#save{color:var(--ink-3)}
+#save[aria-pressed="true"]{color:var(--band)}
+#next{
+  padding:11px 22px;background:var(--surface);border:1px solid var(--line);
+  border-radius:999px;font-size:16px;font-weight:560;
+}
+#next:active{background:#2B3038}
+
+/* Bildschirme */
+.screen{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;min-height:0}
+.screen h2{font-size:clamp(24px,6.6vw,32px);font-weight:640;letter-spacing:-.02em;margin:0 0 12px}
+.screen p{color:var(--ink-2);margin:0 0 8px;max-width:32ch}
+.big{font-size:64px;font-weight:680;letter-spacing:-.04em;line-height:1;margin-bottom:8px;font-variant-numeric:tabular-nums}
+.quiet{font-size:14px;color:var(--ink-3);margin-top:28px;border-bottom:1px solid var(--line);align-self:flex-start;padding-bottom:2px}
+
+/* Listen / Einstellungen */
+.scroll{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;padding-top:20px}
+.scroll h2{margin-bottom:18px}
+.row{
+  display:flex;align-items:center;gap:14px;padding:14px 0;
+  border-bottom:1px solid var(--line);text-align:left;width:100%;
+}
+.dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:currentColor}
+.row .lbl{flex:1 1 auto;font-size:16px}
+.row .chk{font-size:14px;color:var(--ink-3)}
+.row[aria-pressed="true"] .chk{color:var(--ink)}
+.row[aria-pressed="false"] .lbl{color:var(--ink-3)}
+.seg{display:flex;gap:8px;margin:14px 0 30px}
+.seg button{
+  flex:1 1 0;padding:11px 0;border:1px solid var(--line);border-radius:10px;
+  font-size:15px;color:var(--ink-2);background:var(--ground);
+}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);border-color:var(--ink-3)}
+.savedcard{padding:16px 0;border-bottom:1px solid var(--line)}
+.savedcard h3{font-size:17px;font-weight:600;margin:0 0 6px;display:flex;align-items:center;gap:9px}
+.savedcard p{font-size:15px;color:var(--ink-2);margin:0;max-width:40ch}
+.savedcard button{font-size:13px;color:var(--ink-3);margin-top:10px}
+.empty{color:var(--ink-3);font-size:15.5px;max-width:30ch}
+.danger{margin-top:12px;font-size:15px;color:var(--auto)}
+.sublabel{font-size:13px;color:var(--ink-3);margin:26px 0 0}
+[hidden]{display:none !important}
+
+@media (prefers-reduced-motion:reduce){.anim{animation:none}*{transition:none !important}}
+</style>
+</head>
+<body>
+
+<div id="band"></div>
+
+<div id="app">
+
+  <header>
+    <div id="ticks" aria-hidden="true"></div>
+    <button class="iconbtn" id="btnSaved" aria-label="Merkliste">
+      <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg>
+    </button>
+    <button class="iconbtn" id="btnSettings" aria-label="Einstellungen">
+      <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>
+    </button>
+  </header>
+
+  <!-- Kartenansicht -->
+  <main id="viewCard">
+    <div id="cat"></div>
+    <h1 id="title"></h1>
+    <p id="body"></p>
+    <button id="morebtn" hidden>Mehr dazu</button>
+    <div id="extra" hidden></div>
+  </main>
+
+  <!-- Tagespensum geschafft -->
+  <section class="screen" id="viewDone" hidden>
+    <div class="big" id="doneNum">0</div>
+    <h2>Fertig für heute.</h2>
+    <p id="streakText"></p>
+    <p>Leg das Handy weg. Der Stapel läuft nicht davon.</p>
+    <button class="quiet" id="btnMore5">Trotzdem noch fünf Karten</button>
+  </section>
+
+  <!-- Merkliste -->
+  <section class="scroll" id="viewSaved" hidden>
+    <h2>Merkliste</h2>
+    <div id="savedList"></div>
+  </section>
+
+  <!-- Einstellungen -->
+  <section class="scroll" id="viewSettings" hidden>
+    <h2>Einstellungen</h2>
+    <div id="catList"></div>
+    <p class="sublabel">Karten pro Tag</p>
+    <div class="seg" id="goalSeg"></div>
+    <p class="sublabel" id="stats"></p>
+    <button class="danger" id="btnReset">Gesehene Karten zurücksetzen</button>
+  </section>
+
+  <footer id="foot">
+    <button class="iconbtn" id="save" aria-label="Merken" aria-pressed="false">
+      <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg>
+    </button>
+    <span id="count"></span>
+    <button id="next">Weiter</button>
+  </footer>
+
+</div>
+
+<script src="cards.js"></script>
+<script>
+(function(){
+"use strict";
+
+const CATS = {
+  fert:{name:"Fertigung & CAD", color:"var(--fert)"},
+  teil:{name:"Bauteile",        color:"var(--teil)"},
+  elek:{name:"Elektronik",      color:"var(--elek)"},
+  auto:{name:"Auto & Oldtimer", color:"var(--auto)"},
+  fin :{name:"Finanzen",        color:"var(--fin)"}
+};
+const KEY = "stapel.v1";
+const ALL = window.CARDS || [];
+
+/* ---------- Zustand ---------- */
+function today(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function yesterday(){ const d=new Date(); d.setDate(d.getDate()-1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+const def = { day:today(), done:0, goal:12, streak:0, lastDone:"", seen:[], saved:[], off:[] };
+let S;
+try { S = Object.assign({}, def, JSON.parse(localStorage.getItem(KEY) || "{}")); }
+catch(e){ S = Object.assign({}, def); }
+if (S.day !== today()) { S.day = today(); S.done = 0; }
+
+function store(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+
+/* ---------- Stapel ---------- */
+let deck = [], pos = 0, current = null, history = [];
+
+function activeIds(){
+  const out = [];
+  for (let i=0;i<ALL.length;i++){ if (S.off.indexOf(ALL[i].c) === -1) out.push(i); }
+  return out;
+}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function buildDeck(){
+  const act = activeIds();
+  let fresh = act.filter(id => S.seen.indexOf(id) === -1);
+  if (fresh.length === 0){
+    S.seen = S.seen.slice(-15);            // kurze Sperrfrist, damit sich nichts sofort wiederholt
+    fresh = act.filter(id => S.seen.indexOf(id) === -1);
+  }
+  deck = shuffle(fresh); pos = 0;
+}
+
+/* ---------- Ansichten ---------- */
+const el = id => document.getElementById(id);
+const views = { card:el("viewCard"), done:el("viewDone"), saved:el("viewSaved"), settings:el("viewSettings") };
+let view = "card";
+
+function show(name){
+  view = name;
+  for (const k in views) views[k].hidden = (k !== name);
+  el("foot").hidden = (name !== "card");
+  el("ticks").style.visibility = (name === "card" || name === "done") ? "visible" : "hidden";
+  el("btnSaved").setAttribute("aria-pressed", name === "saved");
+  el("btnSettings").setAttribute("aria-pressed", name === "settings");
+  if (name === "saved") renderSaved();
+  if (name === "settings") renderSettings();
+  if (name === "done") renderDone();
+}
+
+/* ---------- Karte zeichnen ---------- */
+function paint(){
+  if (S.done >= S.goal){ show("done"); renderTicks(); return; }
+  if (pos >= deck.length) buildDeck();
+  if (deck.length === 0){
+    show("card");
+    el("cat").textContent = "";
+    el("title").textContent = "Keine Themen aktiv";
+    el("body").textContent = "In den Einstellungen mindestens ein Thema einschalten.";
+    el("morebtn").hidden = true; el("extra").hidden = true;
+    return;
+  }
+  const id = deck[pos];
+  current = id;
+  const c = ALL[id];
+  const col = CATS[c.c] ? CATS[c.c].color : "var(--ink-3)";
+  document.documentElement.style.setProperty("--band", col);
+
+  el("cat").textContent = CATS[c.c] ? CATS[c.c].name : c.c;
+  el("title").textContent = c.t;
+  el("body").textContent = c.b;
+  el("extra").hidden = true;
+  el("extra").textContent = c.x || "";
+  el("morebtn").hidden = !c.x;
+  el("morebtn").textContent = "Mehr dazu";
+  el("save").setAttribute("aria-pressed", S.saved.indexOf(id) !== -1);
+  el("count").textContent = (S.done + 1) + " von " + S.goal;
+
+  const m = views.card;
+  m.scrollTop = 0;
+  m.classList.remove("anim"); void m.offsetWidth; m.classList.add("anim");
+  renderTicks();
+  show("card");
+}
+
+function renderTicks(){
+  const t = el("ticks");
+  if (t.children.length !== S.goal){
+    t.innerHTML = "";
+    for (let i=0;i<S.goal;i++) t.appendChild(document.createElement("i"));
+  }
+  for (let i=0;i<t.children.length;i++) t.children[i].className = (i < S.done) ? "on" : "";
+}
+
+/* ---------- Weiterblättern ---------- */
+function next(){
+  if (view !== "card") { show("card"); return; }
+  if (current !== null && S.seen.indexOf(current) === -1) S.seen.push(current);
+  if (S.seen.length > 400) S.seen = S.seen.slice(-400);
+  history.push(pos);
+  S.done++;
+  pos++;
+  if (S.done >= S.goal && S.lastDone !== today()){
+    S.streak = (S.lastDone === yesterday()) ? S.streak + 1 : 1;
+    S.lastDone = today();
+  }
+  store();
+  paint();
+}
+function prev(){
+  if (view !== "card" || history.length === 0) return;
+  pos = history.pop();
+  S.done = Math.max(0, S.done - 1);
+  store();
+  paint();
+}
+
+/* ---------- Abschluss ---------- */
+function renderDone(){
+  el("doneNum").textContent = S.done;
+  el("streakText").textContent = S.streak > 1
+    ? S.streak + " Tage hintereinander."
+    : "Morgen geht es weiter.";
+  const d = el("viewDone");
+  d.classList.remove("anim"); void d.offsetWidth; d.classList.add("anim");
+}
+
+/* ---------- Merkliste ---------- */
+function renderSaved(){
+  const wrap = el("savedList");
+  wrap.innerHTML = "";
+  if (S.saved.length === 0){
+    const p = document.createElement("p");
+    p.className = "empty";
+    p.textContent = "Noch nichts gemerkt. Das Lesezeichen unten links legt eine Karte hier ab.";
+    wrap.appendChild(p);
+    return;
+  }
+  S.saved.slice().reverse().forEach(id => {
+    const c = ALL[id]; if (!c) return;
+    const box = document.createElement("div"); box.className = "savedcard";
+    const h = document.createElement("h3");
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    dot.style.color = CATS[c.c] ? CATS[c.c].color : "var(--ink-3)";
+    h.appendChild(dot); h.appendChild(document.createTextNode(c.t));
+    const p = document.createElement("p"); p.textContent = c.b;
+    const b = document.createElement("button"); b.textContent = "Entfernen";
+    b.addEventListener("click", () => {
+      const i = S.saved.indexOf(id); if (i !== -1) S.saved.splice(i,1);
+      store(); renderSaved();
+    });
+    box.appendChild(h); box.appendChild(p); box.appendChild(b);
+    wrap.appendChild(box);
+  });
+}
+
+/* ---------- Einstellungen ---------- */
+function renderSettings(){
+  const list = el("catList"); list.innerHTML = "";
+  Object.keys(CATS).forEach(key => {
+    const on = S.off.indexOf(key) === -1;
+    const row = document.createElement("button");
+    row.className = "row"; row.setAttribute("aria-pressed", on);
+    const dot = document.createElement("span");
+    dot.className = "dot"; dot.style.color = CATS[key].color;
+    const lbl = document.createElement("span");
+    lbl.className = "lbl"; lbl.textContent = CATS[key].name;
+    const cnt = ALL.filter(c => c.c === key).length;
+    const chk = document.createElement("span");
+    chk.className = "chk"; chk.textContent = on ? cnt + " Karten" : "aus";
+    row.appendChild(dot); row.appendChild(lbl); row.appendChild(chk);
+    row.addEventListener("click", () => {
+      const i = S.off.indexOf(key);
+      if (i === -1){ if (S.off.length >= Object.keys(CATS).length - 1) return; S.off.push(key); }
+      else S.off.splice(i,1);
+      store(); buildDeck(); renderSettings();
+    });
+    list.appendChild(row);
+  });
+
+  const seg = el("goalSeg"); seg.innerHTML = "";
+  [8,12,20].forEach(g => {
+    const b = document.createElement("button");
+    b.textContent = g; b.setAttribute("aria-pressed", S.goal === g);
+    b.addEventListener("click", () => { S.goal = g; store(); renderTicks(); renderSettings(); });
+    seg.appendChild(b);
+  });
+
+  const act = activeIds().length;
+  const left = act - S.seen.filter(id => activeIds().indexOf(id) !== -1).length;
+  el("stats").textContent = Math.max(0,left) + " von " + act + " Karten noch ungesehen"
+    + (S.streak > 0 ? " · " + S.streak + " Tage Serie" : "");
+}
+
+el("btnReset").addEventListener("click", () => {
+  S.seen = []; store(); buildDeck(); renderSettings();
+  el("btnReset").textContent = "Zurückgesetzt";
+  setTimeout(() => { el("btnReset").textContent = "Gesehene Karten zurücksetzen"; }, 1600);
+});
+
+el("btnMore5").addEventListener("click", () => {
+  S.goal = S.goal + 5; store();
+  renderTicks(); paint();
+});
+
+/* ---------- Bedienung ---------- */
+el("next").addEventListener("click", next);
+el("btnSaved").addEventListener("click", () => show(view === "saved" ? "card" : "saved"));
+el("btnSettings").addEventListener("click", () => show(view === "settings" ? "card" : "settings"));
+
+el("morebtn").addEventListener("click", () => {
+  const x = el("extra");
+  x.hidden = !x.hidden;
+  el("morebtn").textContent = x.hidden ? "Mehr dazu" : "Weniger";
+  if (!x.hidden) { const m = views.card; m.scrollTop = m.scrollHeight; }
+});
+
+el("save").addEventListener("click", () => {
+  if (current === null) return;
+  const i = S.saved.indexOf(current);
+  if (i === -1) S.saved.push(current); else S.saved.splice(i,1);
+  el("save").setAttribute("aria-pressed", S.saved.indexOf(current) !== -1);
+  store();
+});
+
+/* Wischen */
+let y0 = null, x0 = null, t0 = 0;
+document.addEventListener("touchstart", e => {
+  if (view !== "card" || e.touches.length !== 1) return;
+  y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; t0 = Date.now();
+}, {passive:true});
+document.addEventListener("touchend", e => {
+  if (y0 === null) return;
+  const t = e.changedTouches[0];
+  const dy = t.clientY - y0, dx = t.clientX - x0, dt = Date.now() - t0;
+  y0 = null;
+  if (Math.abs(dx) > Math.abs(dy)) return;
+  if (dt > 800) return;
+  const m = views.card;
+  const scrollable = m.scrollHeight > m.clientHeight + 4;
+  const atBottom = m.scrollTop + m.clientHeight >= m.scrollHeight - 4;
+  const atTop = m.scrollTop <= 4;
+  if (dy < -55 && (!scrollable || atBottom)) next();
+  else if (dy > 55 && (!scrollable || atTop)) prev();
+}, {passive:true});
+
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowDown" || e.key === " " || e.key === "Enter"){ e.preventDefault(); next(); }
+  if (e.key === "ArrowUp"){ e.preventDefault(); prev(); }
+  if (e.key === "Escape") show("card");
+});
+
+/* Verhindert Gummiband-Scrollen in der Kartenansicht */
+document.addEventListener("touchmove", e => {
+  if (view === "done") { e.preventDefault(); return; }
+  if (view !== "card") return;
+  const m = views.card;
+  if (m.scrollHeight <= m.clientHeight + 4) e.preventDefault();
+}, {passive:false});
+
+/* ---------- Start ---------- */
+buildDeck();
+renderTicks();
+paint();
+
+})();
+</script>
+</body>
+</html>
